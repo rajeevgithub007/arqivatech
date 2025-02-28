@@ -4,7 +4,7 @@ import boto3
 app = Flask(__name__)
 
 def get_dynamic_string():
-    ssm = boto3.client('ssm', region_name="us-east-1")
+    ssm = boto3.client('ssm', region_name="eu-west-2")
     response = ssm.get_parameter(Name="dynamic_string")
     return response['Parameter']['Value']
 
