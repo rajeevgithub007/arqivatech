@@ -10,21 +10,25 @@ pipeline {
     }
 
     stages {
-        stage('Clone Repo with PAT if Not Exists') {
-            steps {
-                withCredentials([string(credentialsId: 'arqivasecret', variable: 'GITHUB_PAT')]) {
-                    sh """
-                        if [ ! -d "\$LOCAL_REPO_DIR" ]; then
-                            echo "Cloning repository as it does not exist locally..."
-                            git clone https://${GITHUB_PAT}@github.com/rajeevgithub007/arqivatech.git
-                        else
-                            echo "Repository already exists. Skipping clone."
-                        fi
-                    """
-                }
-            }
+        stage('Clone Repo with PAT') {
+    steps {
+        withCredentials([string(credentialsId: 'arqivasecret', variable: 'GITHUB_PAT')]) {
+            sh """
+                rm -rf ${LOCAL_REPO_DIR}  # Clean old repo
+                git clone https://${GITHUB_PAT}@github.com/rajeevgithub007/arqivatech.git
+            """
         }
-
+    }
+}
+        stage('Verify Cloned Repo') {
+    steps {
+        echo "Verifying contents of cloned repo..."
+        sh '''
+            ls -la ./arqivatech/app/scripts/
+            cat ./arqivatech/app/scripts/start_flask.sh
+        '''
+    }
+}
         stage('Deploy Flask App') {
     steps {
         echo "Deploying Flask App to EC2"
@@ -37,7 +41,8 @@ pipeline {
                     echo "Moving app to /var/www/html/app..."
                     ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} "
                         sudo rm -rf /var/www/html/app &&
-                        sudo mv /home/ubuntu/app /var/www/html/
+                        sudo mv /home/ubuntu/app /var/www/html/ &&
+                        sudo chown -R ubuntu:ubuntu /var/www/html/app
                     "
 
                     echo "Installing Python dependencies..."
@@ -45,7 +50,7 @@ pipeline {
                         sudo pip3 install -r /var/www/html/app/requirements.txt
                     "
 
-                    echo "Restarting Gunicorn..."
+                    echo "Restarting Flask app with Gunicorn..."
                     ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} "
                         sudo chmod +x /var/www/html/app/scripts/start_flask.sh &&
                         sudo pkill gunicorn || true &&
@@ -55,7 +60,8 @@ pipeline {
             }
         }
     }
-  }
+}
+
 }
 
     post {
