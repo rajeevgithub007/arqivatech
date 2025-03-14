@@ -26,35 +26,37 @@ pipeline {
         }
 
         stage('Deploy Flask App') {
-            steps {
-                echo "Deploying Flask App to EC2"
-                sshagent (credentials: [env.SSH_CREDENTIALS]) {
-                    sh '''
-                        echo "Transferring Flask app..."
-                        scp -o StrictHostKeyChecking=no -r ./arqivatech/app ${EC2_USER}@${EC2_IP}:/home/ubuntu/
+    steps {
+        echo "Deploying Flask App to EC2"
+        script {
+            sshagent (credentials: [env.SSH_CREDENTIALS]) {
+                sh '''
+                    echo "Transferring Flask app to EC2..."
+                    rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no" ./arqivatech/app/ ${EC2_USER}@${EC2_IP}:/home/ubuntu/app/
 
-                        echo "Moving app to web directory with sudo..."
-                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} "
+                    echo "Moving app to /var/www/html/app..."
+                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} "
                         sudo rm -rf /var/www/html/app &&
                         sudo mv /home/ubuntu/app /var/www/html/
-                        "
+                    "
 
-                        echo "Installing Python dependencies..."
-                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
-                            sudo pip3 install -r /var/www/html/app/requirements.txt
-                        '
+                    echo "Installing Python dependencies..."
+                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} "
+                        sudo pip3 install -r /var/www/html/app/requirements.txt
+                    "
 
-                        echo "Setting up Flask app with Gunicorn..."
-                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
-                            sudo chmod +x /var/www/html/app/scripts/start_flask.sh &&
-                            sudo pkill gunicorn || true  # Stop any running instance if exists
-                            sudo /var/www/html/app/scripts/start_flask.sh
-                        '
-                    '''
-                }
+                    echo "Restarting Gunicorn..."
+                    ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} "
+                        sudo chmod +x /var/www/html/app/scripts/start_flask.sh &&
+                        sudo pkill gunicorn || true &&
+                        sudo /var/www/html/app/scripts/start_flask.sh
+                    "
+                '''
             }
         }
     }
+  }
+}
 
     post {
         success {
