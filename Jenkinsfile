@@ -1,31 +1,51 @@
 pipeline {
     agent any
+
     environment {
-        AWS_ACCESS_KEY_ID = credentials('aws_access_key')
-        AWS_SECRET_ACCESS_KEY = credentials('aws_secret_key')
-        FLASK_APP_INSTANCE_IP = '${FlaskAppServerPublicIP}'  // Replace with the actual Flask instance IP
+        EC2_USER = "ubuntu"  // 'ubuntu' for Ubuntu AMI; change if needed
+        EC2_IP = "18.130.106.251" // Flask EC2 IP
+        SSH_CREDENTIALS = 'flask-ec2-key'  // ID for Jenkins SSH key credential
     }
+
     stages {
-        stage('Clone Repository') {
+        stage('Clone Repo') {
             steps {
-                git 'https://github.com/rajeevgithub007/arqivatech.git' // Replace with the actual Git repository URL
+                echo "Cloning branch: ${env.BRANCH_NAME}"
+                checkout scm
             }
         }
-        stage('Install Dependencies') {
-            steps {
-                sh 'pip install -r requirements.txt'
-            }
-        }
+
         stage('Deploy Flask App') {
             steps {
-                script {
-                    // Copy application files to the Flask app server
-                    sh "scp -i ~/.ssh/my-key.pem -r app/* ec2-user@${FLASK_APP_INSTANCE_IP}:/var/www/html"
-                    
-                    // Restart the Flask app service on the EC2 instance
-                    sh "ssh -i~/.ssh/my-key.pem ec2-user@${FLASK_APP_INSTANCE_IP} 'sudo systemctl restart flask-app.service'"
+                echo "Deploying Flask App to EC2"
+                sshagent (credentials: ["${env.SSH_CREDENTIALS}"]) {
+                    sh """
+                        echo "Transferring Flask app..."
+                        scp -o StrictHostKeyChecking=no -r ./app ${EC2_USER}@${EC2_IP}:/var/www/html/
+
+                        echo "Installing Python dependencies..."
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
+                            sudo pip3 install -r /var/www/html/app/requirements.txt
+                        '
+
+                        echo "Setting up Flask app with Gunicorn..."
+                        ssh -o StrictHostKeyChecking=no ${EC2_USER}@${EC2_IP} '
+                            sudo chmod +x /var/www/html/app/scripts/start_flash.sh &&
+                            sudo pkill gunicorn || true  # Stop any running instance if exists
+                            sudo /var/www/html/app/scripts/start_flash.sh
+                        '
+                    """
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Deployment successful!"
+        }
+        failure {
+            echo "❌ Deployment failed!"
         }
     }
 }

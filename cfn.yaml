@@ -1,61 +1,71 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Resources:
-  TerraformStateBucket:
-    Type: AWS::S3::Bucket
-    Properties:
-      BucketName: terraform-state-bucket-unique2 # Ensure uniqueness
-      VersioningConfiguration:
-        Status: Enabled
+  # TerraformStateBucket:
+  #   Type: AWS::S3::Bucket
+  #   Properties:
+  #     BucketName: terraform-state-bucket-arqi # Ensure uniqueness
+  #     VersioningConfiguration:
+  #       Status: Enabled
 
-  TerraformLockTable:
-    Type: AWS::DynamoDB::Table
-    Properties:
-      TableName: terraform-lock-unique2
-      AttributeDefinitions:
-        - AttributeName: LockID
-          AttributeType: S
-      KeySchema:
-        - AttributeName: LockID
-          KeyType: HASH
-      BillingMode: PAY_PER_REQUEST
+  # TerraformLockTable:
+  #   Type: AWS::DynamoDB::Table
+  #   Properties:
+  #     TableName: terraform-lock-arqi
+  #     AttributeDefinitions:
+  #       - AttributeName: LockID
+  #         AttributeType: S
+  #     KeySchema:
+  #       - AttributeName: LockID
+  #         KeyType: HASH
+  #     BillingMode: PAY_PER_REQUEST
 
-  TerraformSSMParameter:
-    Type: AWS::SSM::Parameter
-    Properties:
-      Name: dynamic_string-unique2
-      Type: String
-      Value: "Hello from SSM!"
-      Description: "Dynamic string stored in SSM Parameter Store"
+  # TerraformSSMParameter:
+  #   Type: AWS::SSM::Parameter
+  #   Properties:
+  #     Name: dynamic_string-arqi
+  #     Type: String
+  #     Value: "Hello from SSM!"
+  #     Description: "Dynamic string stored in SSM Parameter Store"
 
-  TerraformIAMRole:
-    Type: AWS::IAM::Role
+  # TerraformIAMRole:
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     RoleName: TerraformServiceRole-arqi
+  #     AssumeRolePolicyDocument:
+  #       Version: '2012-10-17'
+  #       Statement:
+  #         - Effect: Allow
+  #           Principal:
+  #             Service: [ec2.amazonaws.com]
+  #           Action: sts:AssumeRole
+  #     Policies:
+  #       - PolicyName: TerraformFullAccess
+  #         PolicyDocument:
+  #           Version: '2012-10-17'
+  #           Statement:
+  #             - Action: ["s3:*", "dynamodb:*", "ssm:*"]
+  #               Effect: Allow
+  #               Resource: "*"
+  TerraformInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    # DependsOn: TerraformIAMRole
     Properties:
-      RoleName: TerraformServiceRole-unique2
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: [ec2.amazonaws.com]
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: TerraformFullAccess
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Action: ["s3:*", "dynamodb:*", "ssm:*"]
-                Effect: Allow
-                Resource: "*"
-
+      InstanceProfileName: TerraformInstanceProfile-arqi
+      Roles: 
+        - TerraformServiceRole-arqi
+  
+  
+  
   JenkinsServer:
     Type: AWS::EC2::Instance
+    DependsOn: TerraformInstanceProfile
     Properties:
       InstanceType: t2.medium
-      ImageId: ami-0c55b159cbfafe1f0 # Update as per your region
-      KeyName: my-key-pair
-      SecurityGroups:
-        - !Ref JenkinsSecurityGroup
-      IamInstanceProfile: !Ref TerraformIAMRole
+      ImageId: ami-003c3655bc8e97ae1 # Update as per your region
+      KeyName: new-key-pair
+      SecurityGroupIds:
+        - sg-0370218280017bc97
+      IamInstanceProfile: !Ref TerraformInstanceProfile
       UserData:
         Fn::Base64: |
           #!/bin/bash
@@ -71,38 +81,38 @@ Resources:
         - Key: Name
           Value: JenkinsServer
 
-  JenkinsSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: Enable HTTP and SSH access for Jenkins
-      VpcId: vpc-xxxxxxxx # Update with your VPC ID
-      SecurityGroupIngress:
-        - IpProtocol: tcp
-          FromPort: 22
-          ToPort: 22
-          CidrIp: 0.0.0.0/0
-        - IpProtocol: tcp
-          FromPort: 8080
-          ToPort: 8080
-          CidrIp: 0.0.0.0/0
+  # JenkinsSecurityGroup:
+  #   Type: AWS::EC2::SecurityGroup
+  #   Properties:
+  #     GroupDescription: Enable HTTP and SSH access for Jenkins
+  #     VpcId: vpc-0b74b938c4056ab9b # Update with your VPC ID
+  #     SecurityGroupIngress:
+  #       - IpProtocol: tcp
+  #         FromPort: 22
+  #         ToPort: 22
+  #         CidrIp: 0.0.0.0/0
+  #       - IpProtocol: tcp
+  #         FromPort: 8080
+  #         ToPort: 8080
+  #         CidrIp: 0.0.0.0/0
 
-Outputs:
-  BucketName:
-    Description: "The name of the S3 bucket created for Terraform state."
-    Value: !Ref TerraformStateBucket
+# Outputs:
+  # BucketName:
+  #   Description: "The name of the S3 bucket created for Terraform state."
+  #   Value: !Ref TerraformStateBucket
 
-  DynamoDBTableName:
-    Description: "The name of the DynamoDB table used for Terraform lock."
-    Value: !Ref TerraformLockTable
+  # DynamoDBTableName:
+  #   Description: "The name of the DynamoDB table used for Terraform lock."
+  #   Value: !Ref TerraformLockTable
 
-  SSMParameterName:
-    Description: "The name of the SSM parameter created for dynamic string."
-    Value: !Ref TerraformSSMParameter
+  # SSMParameterName:
+  #   Description: "The name of the SSM parameter created for dynamic string."
+  #   Value: !Ref TerraformSSMParameter
 
-  IAMRoleName:
-    Description: "The name of the IAM role created for Terraform."
-    Value: !Ref TerraformIAMRole
+  # IAMRoleName:
+  #   Description: "The name of the IAM role created for Terraform."
+  #   Value: !Ref TerraformIAMRole
 
-  JenkinsServerPublicIP:
-    Description: "The public IP of the Jenkins server."
-    Value: !GetAtt JenkinsServer.PublicIp
+  # JenkinsServerPublicIP:
+  #   Description: "The public IP of the Jenkins server."
+  #   Value: !GetAtt JenkinsServer.PublicIp

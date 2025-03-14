@@ -27,7 +27,7 @@ resource "aws_instance" "flask_app" {
   instance_type          = var.flask_instance_type
   key_name               = var.key_name
   security_groups        = [aws_security_group.flask_app_sg.name]
-  iam_instance_profile   = var.iam_role
+  iam_instance_profile   = var.instance_profile
   tags = {
     Name = "FlaskAppServer"
   }
@@ -40,7 +40,13 @@ output "flask_app_server_ip" {
   value       = aws_instance.flask_app.public_ip
 }
 
-output "jenkins_server_ip" {
-  description = "The public IP of the Jenkins server"
-  value       = aws_cloudformation_stack.app_stack.outputs["JenkinsServerPublicIP"]
+# Get the Jenkins Security Group output from the first CloudFormation stack
+data "aws_cloudformation_stack" "jenkins_sg_stack" {
+  name = "terraform-resources-arqi"  # Replace with your Jenkins Security Group stack name
 }
+
+# Get the Jenkins Server output from the second CloudFormation stack
+data "aws_cloudformation_stack" "jenkins_server_stack" {
+  name = "terraform-resources-arqivas"  # Replace with your Jenkins Server stack name
+}
+
